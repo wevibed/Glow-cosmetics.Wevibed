@@ -73,7 +73,7 @@ function App(){
   <div className="top"><span>Beauty • Cosmetics • Self-Care</span><span>Real catalogue • Product images added</span></div>
   <header><a className="brand" href="#"><i>♕</i><strong>NIKKI<small>BEAUTY & COSMETICS</small></strong></a><nav><a href="#categories">Categories</a><a href="#products">Catalogue</a><a href="#contact">Contact</a></nav><div className="icons"><button aria-label="Search">⌕</button><button aria-label="Menu">☰</button></div></header>
   <main>
-   <section className="hero"><img src={images.hero} alt="Beauty products"/><div className="heroOverlay"></div><div className="heroCopy"><p className="eyebrow">REAL PRODUCTS • REAL CATALOGUE</p><h1>Glow<br/>Confidently<br/><em>Every Day</em></h1><p>Shop skincare, body care, sun care and beauty essentials from the current catalogue.</p><a className="btn" href="#products">VIEW CATALOGUE →</a></div></section>
+   <section className="hero"><img src={images.hero} alt="Beauty products" loading="eager" fetchPriority="high" decoding="async"/><div className="heroOverlay"></div><div className="heroCopy"><p className="eyebrow">REAL PRODUCTS • REAL CATALOGUE</p><h1>Glow<br/>Confidently<br/><em>Every Day</em></h1><p>Shop skincare, body care, sun care and beauty essentials from the current catalogue.</p><a className="btn" href="#products">VIEW CATALOGUE →</a></div></section>
 
    <section className="trust"><span>✦<b>Real Product Photos</b><small>From the supplied catalogue</small></span><span>♕<b>Current Prices</b><small>Catalogue pricing</small></span><span>♡<b>Easy Enquiries</b><small>Ask before ordering</small></span><span>⌂<b>Store Collection</b><small>Contact for details</small></span></section>
 
