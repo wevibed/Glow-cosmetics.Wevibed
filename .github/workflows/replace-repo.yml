@@ -1,4 +1,4 @@
-name: Replace Glow Cosmetics Site
+name: Finalize Glow Cosmetics
 
 on:
   workflow_dispatch:
@@ -16,124 +16,116 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Locate uploaded ZIP
+      - name: Find project
         shell: bash
         run: |
           set -e
 
-          echo "Files in repository:"
-          ls -lah
+          echo "Searching for Glow Cosmetics project..."
 
-          ZIP=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
-
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: Glow Cosmetics ZIP was not found."
-            exit 1
-          fi
-
-          echo "Using ZIP:"
-          echo "$ZIP"
-
-          echo "ZIP_PATH=$ZIP" >> "$GITHUB_ENV"
-
-      - name: Extract Glow Cosmetics project
-        shell: bash
-        run: |
-          set -e
-
-          rm -rf /tmp/glow
-          mkdir -p /tmp/glow
-
-          echo "Extracting:"
-          echo "$ZIP_PATH"
-
-          unzip -q "$ZIP_PATH" -d /tmp/glow
-
-          echo ""
-          echo "Searching for package.json..."
-
-          PROJECT=$(find /tmp/glow \
+          PROJECT=$(find . \
             -type f \
             -name "package.json" \
+            -not -path "./.git/*" \
             -not -path "*/node_modules/*" \
             -printf '%h\n' \
             | head -n 1)
 
           if [ -z "$PROJECT" ]; then
-            echo "ERROR: Could not find the Glow Cosmetics project."
-            echo ""
-            find /tmp/glow -maxdepth 5 -type f | head -200
+            echo "ERROR: package.json not found."
             exit 1
           fi
 
-          echo ""
-          echo "FOUND PROJECT:"
+          echo "Project found:"
           echo "$PROJECT"
 
           echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
-
-      - name: Remove old repository
-        shell: bash
-        run: |
-          set -e
-
-          echo "Removing old repository files..."
-
-          find . -mindepth 1 -maxdepth 1 \
-            ! -name ".git" \
-            -exec rm -rf {} +
-
-          echo "Old repository removed."
-
-      - name: Copy new Glow Cosmetics site
-        shell: bash
-        run: |
-          set -e
-
-          echo "Copying:"
-          echo "$PROJECT"
-
-          cp -a "$PROJECT"/. .
-
-          echo "New project copied."
-
-      - name: Remove node_modules
-        shell: bash
-        run: |
-          rm -rf node_modules
-
-          echo "node_modules removed."
-          echo "Dependencies will be installed by the hosting platform."
-
-      - name: Remove ZIP
-        shell: bash
-        run: |
-          find . -maxdepth 2 -type f -iname "*.zip" -delete
 
       - name: Verify project
         shell: bash
         run: |
           set -e
 
-          echo "Checking project..."
+          echo "Checking:"
+          echo "$PROJECT"
+
+          test -f "$PROJECT/package.json"
+
+          echo ""
+          echo "package.json found."
+
+          echo ""
+          echo "Project contents:"
+          find "$PROJECT" -maxdepth 2 -type f \
+            ! -path "*/node_modules/*" \
+            | sort | head -200
+
+      - name: Create clean repository
+        shell: bash
+        run: |
+          set -e
+
+          echo "Creating clean temporary directory..."
+
+          mkdir /tmp/glow-final
+
+          cp -a "$PROJECT"/. /tmp/glow-final/
+
+      - name: Remove old repository contents
+        shell: bash
+        run: |
+          set -e
+
+          echo "Removing old repository contents..."
+
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name ".git" \
+            -exec rm -rf {} +
+
+      - name: Copy final Glow Cosmetics project
+        shell: bash
+        run: |
+          set -e
+
+          cp -a /tmp/glow-final/. .
+
+          echo ""
+          echo "Final repository structure:"
+          find . -maxdepth 2 -type f \
+            ! -path "./.git/*" \
+            ! -path "*/node_modules/*" \
+            | sort | head -200
+
+      - name: Remove node_modules
+        shell: bash
+        run: |
+          find . -type d -name "node_modules" -prune -exec rm -rf {} +
+
+      - name: Verify final project
+        shell: bash
+        run: |
+          set -e
+
+          echo "Verifying final project..."
 
           test -f package.json
           test -d src
-          test -d public
 
+          echo ""
+          echo "SUCCESS"
           echo ""
           echo "package.json:"
           cat package.json
 
           echo ""
-          echo "Product images:"
-          find public/products -type f | wc -l
+          echo "Source files:"
+          find src -type f | wc -l
 
           echo ""
-          echo "Project structure:"
-          find . -maxdepth 2 -type f \
-            ! -path "./.git/*" \
-            | sort | head -200
+          echo "Public files:"
+          if [ -d public ]; then
+            find public -type f | wc -l
+          fi
 
       - name: Commit changes
         shell: bash
@@ -150,9 +142,9 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update Glow Cosmetics with 60 products"
+          git commit -m "Finalize Glow Cosmetics 60-product catalogue"
 
-      - name: Push changes
+      - name: Push to main
         shell: bash
         run: |
           set -e
