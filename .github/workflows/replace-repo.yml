@@ -1,4 +1,4 @@
-name: Replace Repository With ZIP
+name: Replace Glow Cosmetics Site
 
 on:
   workflow_dispatch:
@@ -16,142 +16,126 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Find ZIP
-        id: find_zip
+      - name: Locate uploaded ZIP
         shell: bash
         run: |
           set -e
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+          echo "Files in repository:"
+          ls -lah
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: No ZIP file found in repository root."
-            echo ""
-            echo "Files currently in repository:"
-            ls -la
+          ZIP=$(find . -maxdepth 2 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "ERROR: Glow Cosmetics ZIP was not found."
             exit 1
           fi
 
-          echo "ZIP found:"
-          echo "$ZIP_FILE"
+          echo "Using ZIP:"
+          echo "$ZIP"
 
-          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "ZIP_PATH=$ZIP" >> "$GITHUB_ENV"
 
-      - name: Inspect ZIP
+      - name: Extract Glow Cosmetics project
         shell: bash
         run: |
           set -e
 
-          echo "ZIP contents:"
-          unzip -l "${{ steps.find_zip.outputs.zip_file }}"
+          rm -rf /tmp/glow
+          mkdir -p /tmp/glow
 
-      - name: Extract ZIP
-        shell: bash
-        run: |
-          set -e
+          echo "Extracting:"
+          echo "$ZIP_PATH"
 
-          rm -rf /tmp/glow-extracted
-          mkdir -p /tmp/glow-extracted
+          unzip -q "$ZIP_PATH" -d /tmp/glow
 
-          unzip -q "${{ steps.find_zip.outputs.zip_file }}" \
-            -d /tmp/glow-extracted
+          echo ""
+          echo "Searching for package.json..."
 
-          echo "Extraction complete."
+          PROJECT=$(find /tmp/glow \
+            -type f \
+            -name "package.json" \
+            -not -path "*/node_modules/*" \
+            -printf '%h\n' \
+            | head -n 1)
 
-          echo "Top-level contents:"
-          find /tmp/glow-extracted -maxdepth 2 -type f | head -100
-
-      - name: Locate project
-        id: project
-        shell: bash
-        run: |
-          set -e
-
-          PROJECT_ROOT=""
-
-          # Case 1: package.json is directly in extracted folder
-          if [ -f "/tmp/glow-extracted/package.json" ]; then
-            PROJECT_ROOT="/tmp/glow-extracted"
-          fi
-
-          # Case 2: ZIP contains one project folder
-          if [ -z "$PROJECT_ROOT" ]; then
-            PROJECT_ROOT=$(find /tmp/glow-extracted \
-              -mindepth 1 \
-              -maxdepth 3 \
-              -type f \
-              -name "package.json" \
-              -printf '%h\n' \
-              | head -n 1)
-          fi
-
-          if [ -z "$PROJECT_ROOT" ]; then
-            echo "ERROR: package.json was not found."
+          if [ -z "$PROJECT" ]; then
+            echo "ERROR: Could not find the Glow Cosmetics project."
             echo ""
-            echo "Extracted files:"
-            find /tmp/glow-extracted -maxdepth 4 -type f | head -200
+            find /tmp/glow -maxdepth 5 -type f | head -200
             exit 1
           fi
 
-          echo "Project root:"
-          echo "$PROJECT_ROOT"
+          echo ""
+          echo "FOUND PROJECT:"
+          echo "$PROJECT"
 
-          echo "project_root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
 
-      - name: Remove old site
+      - name: Remove old repository
         shell: bash
         run: |
           set -e
 
-          echo "Removing old repository contents..."
+          echo "Removing old repository files..."
 
           find . -mindepth 1 -maxdepth 1 \
             ! -name ".git" \
             -exec rm -rf {} +
 
-          echo "Old site removed."
+          echo "Old repository removed."
 
-      - name: Copy new site
+      - name: Copy new Glow Cosmetics site
         shell: bash
         run: |
           set -e
 
-          PROJECT_ROOT="${{ steps.project.outputs.project_root }}"
+          echo "Copying:"
+          echo "$PROJECT"
 
-          echo "Copying new Glow Cosmetics site..."
+          cp -a "$PROJECT"/. .
 
-          cp -a "$PROJECT_ROOT"/. .
+          echo "New project copied."
 
-          echo "New site copied."
-
-      - name: Remove uploaded ZIP
+      - name: Remove node_modules
         shell: bash
         run: |
-          rm -f ./*.zip
+          rm -rf node_modules
 
-      - name: Verify new repository
+          echo "node_modules removed."
+          echo "Dependencies will be installed by the hosting platform."
+
+      - name: Remove ZIP
+        shell: bash
+        run: |
+          find . -maxdepth 2 -type f -iname "*.zip" -delete
+
+      - name: Verify project
         shell: bash
         run: |
           set -e
 
-          echo "Checking new project..."
+          echo "Checking project..."
 
-          if [ ! -f "package.json" ]; then
-            echo "ERROR: package.json missing after replacement."
-            exit 1
-          fi
-
-          echo ""
-          echo "package.json found."
+          test -f package.json
+          test -d src
+          test -d public
 
           echo ""
-          echo "Project files:"
+          echo "package.json:"
+          cat package.json
+
+          echo ""
+          echo "Product images:"
+          find public/products -type f | wc -l
+
+          echo ""
+          echo "Project structure:"
           find . -maxdepth 2 -type f \
             ! -path "./.git/*" \
-            | sort \
-            | head -200
+            | sort | head -200
 
-      - name: Commit replacement
+      - name: Commit changes
         shell: bash
         run: |
           set -e
@@ -166,11 +150,11 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update Glow Cosmetics catalogue with 60 products"
+          git commit -m "Update Glow Cosmetics with 60 products"
 
       - name: Push changes
         shell: bash
         run: |
           set -e
 
-          git push origin HEAD
+          git push origin HEAD:main
