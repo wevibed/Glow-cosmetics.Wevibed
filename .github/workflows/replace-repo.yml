@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   replace:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -16,80 +16,146 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Find uploaded ZIP
-        id: zip
+      - name: Find ZIP
+        id: find_zip
         shell: bash
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: No ZIP file found in repository root."
+            echo ""
+            echo "Files currently in repository:"
+            ls -la
             exit 1
           fi
 
-          echo "Found ZIP: $ZIP_FILE"
-          echo "zip=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "ZIP found:"
+          echo "$ZIP_FILE"
+
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Inspect ZIP
+        shell: bash
+        run: |
+          set -e
+
+          echo "ZIP contents:"
+          unzip -l "${{ steps.find_zip.outputs.zip_file }}"
 
       - name: Extract ZIP
         shell: bash
         run: |
-          rm -rf extracted
-          mkdir extracted
+          set -e
 
-          unzip -q "${{ steps.zip.outputs.zip }}" -d extracted
+          rm -rf /tmp/glow-extracted
+          mkdir -p /tmp/glow-extracted
 
-          echo "Extracted contents:"
-          find extracted -maxdepth 2 -type f | head -100
+          unzip -q "${{ steps.find_zip.outputs.zip_file }}" \
+            -d /tmp/glow-extracted
 
-      - name: Locate project root
+          echo "Extraction complete."
+
+          echo "Top-level contents:"
+          find /tmp/glow-extracted -maxdepth 2 -type f | head -100
+
+      - name: Locate project
+        id: project
         shell: bash
         run: |
-          if [ -f "extracted/package.json" ]; then
-            echo "Project is at extracted/"
-            echo "PROJECT_ROOT=extracted" >> "$GITHUB_ENV"
-          else
-            PROJECT_DIR=$(find extracted -mindepth 1 -maxdepth 2 -name package.json -printf '%h\n' | head -n 1)
+          set -e
 
-            if [ -z "$PROJECT_DIR" ]; then
-              echo "ERROR: Could not find package.json in ZIP."
-              exit 1
-            fi
+          PROJECT_ROOT=""
 
-            echo "Project found at: $PROJECT_DIR"
-            echo "PROJECT_ROOT=$PROJECT_DIR" >> "$GITHUB_ENV"
+          # Case 1: package.json is directly in extracted folder
+          if [ -f "/tmp/glow-extracted/package.json" ]; then
+            PROJECT_ROOT="/tmp/glow-extracted"
           fi
 
-      - name: Remove old repository files
+          # Case 2: ZIP contains one project folder
+          if [ -z "$PROJECT_ROOT" ]; then
+            PROJECT_ROOT=$(find /tmp/glow-extracted \
+              -mindepth 1 \
+              -maxdepth 3 \
+              -type f \
+              -name "package.json" \
+              -printf '%h\n' \
+              | head -n 1)
+          fi
+
+          if [ -z "$PROJECT_ROOT" ]; then
+            echo "ERROR: package.json was not found."
+            echo ""
+            echo "Extracted files:"
+            find /tmp/glow-extracted -maxdepth 4 -type f | head -200
+            exit 1
+          fi
+
+          echo "Project root:"
+          echo "$PROJECT_ROOT"
+
+          echo "project_root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Remove old site
         shell: bash
         run: |
+          set -e
+
+          echo "Removing old repository contents..."
+
           find . -mindepth 1 -maxdepth 1 \
             ! -name ".git" \
-            ! -name "extracted" \
-            ! -name "$(basename "${{ steps.zip.outputs.zip }}")" \
             -exec rm -rf {} +
 
-      - name: Copy new project
+          echo "Old site removed."
+
+      - name: Copy new site
         shell: bash
         run: |
+          set -e
+
+          PROJECT_ROOT="${{ steps.project.outputs.project_root }}"
+
+          echo "Copying new Glow Cosmetics site..."
+
           cp -a "$PROJECT_ROOT"/. .
 
-      - name: Remove ZIP and temporary files
-        shell: bash
-        run: |
-          rm -rf extracted
-          rm -f *.zip
+          echo "New site copied."
 
-      - name: Show final structure
+      - name: Remove uploaded ZIP
         shell: bash
         run: |
-          echo "Final repository:"
+          rm -f ./*.zip
+
+      - name: Verify new repository
+        shell: bash
+        run: |
+          set -e
+
+          echo "Checking new project..."
+
+          if [ ! -f "package.json" ]; then
+            echo "ERROR: package.json missing after replacement."
+            exit 1
+          fi
+
+          echo ""
+          echo "package.json found."
+
+          echo ""
+          echo "Project files:"
           find . -maxdepth 2 -type f \
             ! -path "./.git/*" \
-            | sort | head -200
+            | sort \
+            | head -200
 
-      - name: Commit and push
+      - name: Commit replacement
         shell: bash
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -100,5 +166,11 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Replace site with updated Glow Cosmetics catalogue"
-          git push
+          git commit -m "Update Glow Cosmetics catalogue with 60 products"
+
+      - name: Push changes
+        shell: bash
+        run: |
+          set -e
+
+          git push origin HEAD
