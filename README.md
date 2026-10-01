@@ -36,6 +36,7 @@ Do not add products or prices from memory, web searches, or the previous site. U
 The supplied catalogue contains repeated/partially visible listings, including:
 - multiple `Dark Spot Corrector` entries with prices in the $6–$7 range;
 - multiple `Bright Complete` listings at $8;
+- Final catalogue build deployed.
 - multiple La Roche-Posay `Sunscreen` listings at $6;
 - truncated names such as `Anti-D…`, `Retinal Lip…`, `Daily Vitamin…`, and `Maca Plus Extreme Cur…`.
 
