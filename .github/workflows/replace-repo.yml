@@ -1,0 +1,122 @@
+name: Replace Repository With Final Repo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find uploaded ZIP
+        id: zip
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file found in repository root."
+            exit 1
+          fi
+
+          echo "Found ZIP: $ZIP_FILE"
+          echo "zip=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Extract final repository
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p extracted
+
+          unzip -q "${{ steps.zip.outputs.zip }}" -d extracted
+
+          echo "Extracted files:"
+          find extracted -maxdepth 3 -type f | head -100
+
+      - name: Locate project root
+        id: project
+        shell: bash
+        run: |
+          set -e
+
+          PACKAGE=$(find extracted -name package.json -type f | head -n 1)
+
+          if [ -z "$PACKAGE" ]; then
+            echo "ERROR: package.json was not found inside the ZIP."
+            exit 1
+          fi
+
+          PROJECT_ROOT=$(dirname "$PACKAGE")
+
+          echo "Project root: $PROJECT_ROOT"
+          echo "root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Remove old repository files
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE="${{ steps.zip.outputs.zip }}"
+
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name ".git" \
+            ! -name "$ZIP_FILE" \
+            -exec rm -rf {} +
+
+      - name: Copy final repository
+        shell: bash
+        run: |
+          set -e
+
+          PROJECT_ROOT="${{ steps.project.outputs.root }}"
+
+          cp -a "$PROJECT_ROOT"/. .
+
+          rm -rf extracted
+
+          echo "Final repository contents:"
+          ls -la
+
+      - name: Remove ZIP from repository
+        shell: bash
+        run: |
+          rm -f *.zip
+
+      - name: Verify project
+        shell: bash
+        run: |
+          set -e
+
+          test -f package.json
+
+          echo "package.json found."
+          echo "Project replacement completed successfully."
+
+      - name: Commit replacement
+        shell: bash
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Replace repository with Nyarie Glow Cosmetics Wholesale final build"
+          git push
