@@ -4,6 +4,9 @@ import "./styles.css";
 
 const A = "/products/";
 const BRAND = "Nyarie Glow Cosmetics Wholesale";
+// Replace this with the business WhatsApp number in international format, digits only.
+// Example for Zimbabwe: 2637XXXXXXXX.
+const WHATSAPP_NUMBER = "263782418623";
 
 /*
  * MASTER CATALOGUE
@@ -170,13 +173,13 @@ function ProductImage({p}) {
   return <img src={src} alt={`${p.brand} ${p.name}`} loading="lazy" decoding="async" onError={()=>setFailed(true)}/>;
 }
 
-function ProductCard({p}) {
+function ProductCard({p,onAdd}) {
   return <article className="product">
     <div className="productImage"><ProductImage p={p}/></div>
     <div className="productBody">
       <span className="productCat">{p.brand} · {p.category}</span>
       <h3>{p.name}</h3>
-      <div className="productBottom"><strong>${p.price.toFixed(2)}</strong><a href="#contact">Enquire →</a></div>
+      <div className="productBottom"><strong>${p.price.toFixed(2)}</strong><button className="addBtn" onClick={()=>onAdd(p)}>+ Add</button></div>
     </div>
   </article>;
 }
@@ -184,6 +187,42 @@ function ProductCard({p}) {
 function App() {
   const [category,setCategory]=useState("All");
   const [query,setQuery]=useState("");
+  const [cart,setCart]=useState([]);
+  const [cartOpen,setCartOpen]=useState(false);
+
+  const addToCart = (product) => {
+    setCart(current => {
+      const existing = current.find(item => item.id === product.id);
+      if (existing) return current.map(item => item.id === product.id ? {...item,qty:item.qty+1} : item);
+      return [...current,{...product,qty:1}];
+    });
+    setCartOpen(true);
+  };
+
+  const changeQty = (id, delta) => {
+    setCart(current => current.map(item => item.id === id ? {...item,qty:item.qty+delta} : item).filter(item => item.qty > 0));
+  };
+
+  const removeFromCart = (id) => setCart(current => current.filter(item => item.id !== id));
+  const cartCount = cart.reduce((sum,item)=>sum+item.qty,0);
+  const cartTotal = cart.reduce((sum,item)=>sum+(item.price*item.qty),0);
+
+  const checkoutOnWhatsApp = () => {
+    if (!cart.length) return;
+    const lines = cart.map(item => `• ${item.name} — ${item.qty} × $${item.price.toFixed(2)} = $${(item.price*item.qty).toFixed(2)}`);
+    const message = [
+      `Hello ${BRAND},`,
+      `\nI would like to enquire/order for the following products:`,
+      ...lines,
+      `\nTotal catalogue value: $${cartTotal.toFixed(2)}`,
+      `\nPlease confirm availability and ordering details.`
+    ].join("\n");
+    if (WHATSAPP_NUMBER.includes("REPLACE_WITH")) {
+      alert("The business WhatsApp number still needs to be added to the website.");
+      return;
+    }
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`,"_blank","noopener,noreferrer");
+  };
   const categories=["All","Skincare","Body Care","Sun Care","Hair Care","Makeup","Wellness","Accessories","Fashion"];
 
   const filtered=useMemo(() => {
@@ -203,7 +242,7 @@ function App() {
     <header>
       <a className="brand" href="#"><i>✦</i><strong>NYARIE GLOW<small>COSMETICS WHOLESALE</small></strong></a>
       <nav><a href="#categories">Categories</a><a href="#products">Catalogue</a><a href="#contact">Contact</a></nav>
-      <div className="icons"><a href="#search" aria-label="Search">⌕</a><button aria-label="Menu">☰</button></div>
+      <div className="icons"><a href="#search" aria-label="Search">⌕</a><button className="cartButton" onClick={()=>setCartOpen(true)} aria-label="Open cart">🛒<span>{cartCount}</span></button><button aria-label="Menu">☰</button></div>
     </header>
 
     <main>
@@ -238,18 +277,26 @@ function App() {
           <div className="searchWrap"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search product, brand or category…" aria-label="Search the catalogue"/></div>
         </div>
         {query && filtered.length===0 && <div className="noResults"><strong>No catalogue match found.</strong><span>Try a product name, brand, or shorter spelling.</span><button onClick={()=>setQuery("")}>Clear search</button></div>}
-        <div className="products">{filtered.map(p=><ProductCard key={p.id} p={p}/>)}</div>
+        <div className="products">{filtered.map(p=><ProductCard key={p.id} p={p} onAdd={addToCart}/>)}</div>
       </section>
 
       <section className="banner"><img src={A+"whatsapp/axis-dark-serum.jpg"} alt="Skincare collection" loading="lazy"/><div><p className="eyebrow rose">SKINCARE COLLECTION</p><h2>Search the catalogue instead of scrolling.</h2><p>Type a product or brand above to jump directly to matching catalogue listings.</p><a className="btn" href="#search">SEARCH CATALOGUE →</a></div></section>
 
       <section className="feature dark"><div><p className="eyebrow rose">CATALOGUE FIRST</p><h2>See something you like?</h2><p>Send the product name when enquiring. Availability, variants and collection details can be confirmed directly by the business.</p><a className="btn" href="#contact">ASK ABOUT A PRODUCT →</a></div><img src={A+"whatsapp/simple-glow.jpg"} alt="Beauty care" loading="lazy"/></section>
 
-      <section id="contact" className="contact"><div><p className="eyebrow rose">CONTACT NYARIE GLOW COSMETICS WHOLESALE</p><h2>Ready to find your product?</h2><p>Send the product name or screenshot when asking about availability, variants and collection details.</p><p><b>WhatsApp:</b> Contact details to be confirmed</p></div><div className="map"><div className="pin">●</div><strong>{BRAND}</strong><span>Wholesale catalogue · Contact details to be confirmed</span></div></section>
+      <section id="contact" className="contact"><div><p className="eyebrow rose">CONTACT NYARIE GLOW COSMETICS WHOLESALE</p><h2>Ready to find your product?</h2><p>Send the product name or screenshot when asking about availability, variants and collection details.</p><p><b>WhatsApp:</b> Use the WhatsApp button to send an enquiry or your cart.</p></div><div className="map"><div className="pin">●</div><strong>{BRAND}</strong><span>Wholesale catalogue · Contact details to be confirmed</span></div></section>
     </main>
 
     <footer><div className="brand footerBrand"><i>✦</i><strong>NYARIE GLOW<small>COSMETICS WHOLESALE</small></strong></div><p>Skincare · Body Care · Sun Care · Wellness</p><p>© 2026 {BRAND}</p></footer>
-    <a className="wa" href="#contact" aria-label="Contact">⌕</a>
+    <button className="wa" onClick={()=>window.open(`https://wa.me/${WHATSAPP_NUMBER}`,"_blank","noopener,noreferrer")} aria-label="Open WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 3.5A11.8 11.8 0 0 0 12.05.02C5.5.02.17 5.35.17 11.91c0 2.1.55 4.15 1.59 5.96L.06 23.94l6.2-1.63a11.9 11.9 0 0 0 5.79 1.49h.01c6.56 0 11.89-5.33 11.89-11.89 0-3.17-1.23-6.14-3.45-8.41ZM12.06 21.8h-.01a9.86 9.86 0 0 1-5.02-1.38l-.36-.21-3.68.97.98-3.59-.23-.37a9.87 9.87 0 1 1 8.32 4.58Zm5.41-7.39c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.23-.45-2.34-1.43-.86-.77-1.44-1.72-1.61-2.02-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.2 5.09 4.49.71.31 1.27.49 1.7.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"/></svg></button>
+    {cartOpen && <div className="cartBackdrop" onClick={()=>setCartOpen(false)}></div>}
+    <aside className={`cartDrawer ${cartOpen?"open":""}`} aria-label="Shopping cart">
+      <div className="cartHeader"><div><p className="eyebrow rose">YOUR ORDER</p><h2>Cart <span>({cartCount})</span></h2></div><button className="closeCart" onClick={()=>setCartOpen(false)} aria-label="Close cart">×</button></div>
+      {cart.length===0 ? <div className="emptyCart"><div className="emptyIcon">🛒</div><strong>Your cart is empty</strong><span>Add products from the catalogue and they will appear here.</span><button className="btn" onClick={()=>{setCartOpen(false);document.querySelector("#products")?.scrollIntoView({behavior:"smooth"})}}>BROWSE CATALOGUE</button></div> : <>
+        <div className="cartItems">{cart.map(item=><div className="cartItem" key={item.id}><div className="cartThumb">{imageFor(item)?<img src={imageFor(item)} alt=""/>:<span>—</span>}</div><div className="cartInfo"><strong>{item.name}</strong><small>{item.brand} · ${item.price.toFixed(2)} each</small><div className="qty"><button onClick={()=>changeQty(item.id,-1)} aria-label="Decrease quantity">−</button><b>{item.qty}</b><button onClick={()=>changeQty(item.id,1)} aria-label="Increase quantity">+</button><button className="remove" onClick={()=>removeFromCart(item.id)}>Remove</button></div></div><strong className="lineTotal">${(item.price*item.qty).toFixed(2)}</strong></div>)}</div>
+        <div className="cartFooter"><div><span>Catalogue total</span><strong>${cartTotal.toFixed(2)}</strong></div><p>Prices are taken directly from the catalogue. Availability is confirmed by WhatsApp.</p><button className="checkoutBtn" onClick={checkoutOnWhatsApp}>CHECKOUT VIA WHATSAPP →</button></div>
+      </>}
+    </aside>
   </div>;
 }
 createRoot(document.getElementById("root")).render(<App />);
