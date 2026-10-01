@@ -33,24 +33,19 @@ jobs:
           echo "zip=$ZIP_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Extract final repository
+        id: extract
         shell: bash
         run: |
           set -e
 
-          mkdir -p extracted
+          rm -rf /tmp/glow-final
+          mkdir -p /tmp/glow-final
 
-          unzip -q "${{ steps.zip.outputs.zip }}" -d extracted
+          unzip -q "${{ steps.zip.outputs.zip }}" -d /tmp/glow-final
 
-          echo "Extracted files:"
-          find extracted -maxdepth 3 -type f | head -100
+          echo "ZIP extracted successfully."
 
-      - name: Locate project root
-        id: project
-        shell: bash
-        run: |
-          set -e
-
-          PACKAGE=$(find extracted -name package.json -type f | head -n 1)
+          PACKAGE=$(find /tmp/glow-final -name package.json -type f | head -n 1)
 
           if [ -z "$PACKAGE" ]; then
             echo "ERROR: package.json was not found inside the ZIP."
@@ -59,49 +54,63 @@ jobs:
 
           PROJECT_ROOT=$(dirname "$PACKAGE")
 
-          echo "Project root: $PROJECT_ROOT"
-          echo "root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
+          echo "Project root:"
+          echo "$PROJECT_ROOT"
+
+          echo "project_root=$PROJECT_ROOT" >> "$GITHUB_OUTPUT"
 
       - name: Remove old repository files
         shell: bash
         run: |
           set -e
 
-          ZIP_FILE="${{ steps.zip.outputs.zip }}"
+          echo "Removing old repository files..."
 
           find . -mindepth 1 -maxdepth 1 \
             ! -name ".git" \
-            ! -name "$ZIP_FILE" \
             -exec rm -rf {} +
+
+          echo "Old repository files removed."
 
       - name: Copy final repository
         shell: bash
         run: |
           set -e
 
-          PROJECT_ROOT="${{ steps.project.outputs.root }}"
+          PROJECT_ROOT="${{ steps.extract.outputs.project_root }}"
+
+          echo "Copying final project from:"
+          echo "$PROJECT_ROOT"
 
           cp -a "$PROJECT_ROOT"/. .
 
-          rm -rf extracted
+          echo "Final project copied."
 
-          echo "Final repository contents:"
-          ls -la
-
-      - name: Remove ZIP from repository
-        shell: bash
-        run: |
-          rm -f *.zip
-
-      - name: Verify project
+      - name: Remove uploaded ZIP
         shell: bash
         run: |
           set -e
 
-          test -f package.json
+          rm -f *.zip
 
-          echo "package.json found."
-          echo "Project replacement completed successfully."
+          echo "Uploaded ZIP removed."
+
+      - name: Verify final repository
+        shell: bash
+        run: |
+          set -e
+
+          echo "Checking final repository..."
+
+          test -f package.json
+          test -f index.html
+
+          echo "package.json: OK"
+          echo "index.html: OK"
+
+          echo ""
+          echo "Repository root:"
+          ls -la
 
       - name: Commit replacement
         shell: bash
@@ -118,5 +127,8 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Replace repository with Nyarie Glow Cosmetics Wholesale final build"
+          git commit -m "Replace site with Nyarie Glow Cosmetics Wholesale final build"
+
           git push
+
+          echo "Repository replacement completed successfully."
